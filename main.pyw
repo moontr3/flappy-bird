@@ -26,13 +26,13 @@ pg.init()
 
 windowx = 400
 windowy = 400
-cx = 400
-cy = 400
+cx = 600
+cy = 600
 clock = pg.time.Clock()
 fps = 60
 dfps = 0.0
 
-window = pg.display.set_mode((windowx,windowy), pg.RESIZABLE | pg.DOUBLEBUF)
+window = pg.display.set_mode((cx,cy), pg.RESIZABLE | pg.DOUBLEBUF)
 running = True
 pg.display.set_caption('Flappy Bird')
 screen = pg.Surface((windowx, windowy))
@@ -52,6 +52,7 @@ class Player:
         self.image = sprites['player']
         self.moving = False
         self.vel = 0
+        self.smooth_rot = 0
         self.pos = 200
         self.jump_speed = -5
         self.dead = False
@@ -86,6 +87,8 @@ class Player:
         if jumped:
             self.jump()
 
+        # self.smooth_rot = -self.vel*4
+        self.smooth_rot += (-self.vel*4-self.smooth_rot)/2
         self.calc_rect()
         
         collision = self.rect.collidelistall(towers)
@@ -97,7 +100,7 @@ class Player:
 
     def draw(self):
         image = self.image.copy()
-        image = pg.transform.rotate(image, -self.vel*4)
+        image = pg.transform.rotate(image, self.smooth_rot)
         rect = image.get_rect()
         rect.center = self.rect.center
         screen.blit(image, rect)
@@ -266,6 +269,33 @@ class Map:
                             death = True
                     elif death:
                         death = False
+
+                    pg.draw.circle(screen, color, pos, 1)
+
+                vel = self.player.jump_speed
+                pos = list(self.player.rect.center)
+                rpos = list(self.player.rect.topleft)
+                death = False
+
+                for i in range(100):
+                    rect = pg.Rect(rpos, (80,30))
+                    color = (128,128,128)
+
+                    vel += 0.2
+                    pos[0] += SPEED
+                    pos[1] += vel
+                    rpos[0] += SPEED
+                    rpos[1] += vel
+
+                    rects = []
+                    for j in self.towers:
+                        rects.extend(j.to_rects())
+
+                    if rect.collidelistall(rects):
+                        color = (255,0,0)
+                        if not death:
+                            pg.draw.rect(screen, (192,128,128), rect, 1)
+                            death = True
 
                     pg.draw.circle(screen, color, pos, 1)
 
