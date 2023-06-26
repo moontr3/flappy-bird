@@ -6,6 +6,7 @@ TODO
 - saving system
 - restarting game
 - menus
+- fix explosion position
 '''
 
 '''
@@ -87,7 +88,7 @@ class Player:
 
     def draw(self):
         image = self.image.copy()
-        image = pg.transform.rotate(image, -self.vel*7)
+        image = pg.transform.rotate(image, -self.vel*4)
         rect = image.get_rect()
         rect.center = self.rect.center
         screen.blit(image, rect)
