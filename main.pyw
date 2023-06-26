@@ -6,7 +6,6 @@ TODO
 - saving system
 - restarting game
 - menus
-- fix explosion position
 '''
 
 '''
@@ -56,15 +55,19 @@ class Player:
         self.pos = 200
         self.jump_speed = -5
         self.dead = False
+        self.effect = False
+        self.death_rect_pos = 0
         self.calc_rect()
 
     def calc_rect(self):
         self.rect = pg.Rect(110,self.pos, 80,30)
 
-    def die(self):
+    def die(self, pos=200, effect=True):
         if self.dead: return
         self.dead = True
         self.vel = self.jump_speed
+        self.effect = effect
+        self.death_rect_pos = pos
 
     def jump(self):
         if self.dead: return
@@ -77,14 +80,20 @@ class Player:
         if self.moving:
             self.vel += 0.2
             self.pos += self.vel
+            if self.pos > 500:
+                self.pos = 500
 
         if jumped:
             self.jump()
 
         self.calc_rect()
         
-        if self.rect.collidelistall(towers):
-            self.die()
+        collision = self.rect.collidelistall(towers)
+        if collision:
+            pos = towers[collision[0]].x+25
+            self.die(pos)
+        if self.pos < 0 or self.pos > 370:
+            self.die(effect=False)
 
     def draw(self):
         image = self.image.copy()
@@ -306,41 +315,43 @@ class Map:
         if self.player.dead:
             if self.playing:
                 self.playing = False
-                self.death_pos = (200,self.player.pos)
-                for i in range(3):    
-                    size = random.randint(200,300)
+                self.death_pos = (self.player.death_rect_pos,self.player.pos+10)
+                if self.player.effect:
+                    for i in range(3):    
+                        size = random.randint(200,300)
+                        self.particles.append(Particle(
+                            sprites['fire'],
+                            self.death_pos,
+                            (size,size),
+                            vel=(random.random()-0.5,random.random()-0.5),
+                            lifetime=random.randint(100,180)
+                        ))
+    
+            if self.player.effect:
+                self.smoke_timeout -= 1
+                if self.smoke_timeout <= 0:
+                    self.smoke_timeout = 15
+
+                    size = random.randint(60,100)
                     self.particles.append(Particle(
                         sprites['fire'],
                         self.death_pos,
                         (size,size),
-                        vel=(random.random()-0.5,random.random()-0.5),
-                        lifetime=random.randint(100,180)
+                        vel=((random.random()-0.5)/2,(random.random()-0.5)/2),
+                        lifetime=100
                     ))
 
-            self.smoke_timeout -= 1
-            if self.smoke_timeout <= 0:
-                self.smoke_timeout = 15
-
-                size = random.randint(60,100)
-                self.particles.append(Particle(
-                    sprites['fire'],
-                    self.death_pos,
-                    (size,size),
-                    vel=((random.random()-0.5)/2,(random.random()-0.5)/2),
-                    lifetime=100
-                ))
-
-                size = random.randint(130,185)
-                self.particles.append(Particle(
-                    sprites['smoke'],
-                    self.death_pos,
-                    (size,size),
-                    vel=(random.random(),random.random()),
-                    gravity=(-0.04,-0.03),
-                    rotation=random.randint(0,365),
-                    rotation_vel=random.random(),
-                    lifetime=100
-                ))
+                    size = random.randint(130,185)
+                    self.particles.append(Particle(
+                        sprites['smoke'],
+                        self.death_pos,
+                        (size,size),
+                        vel=(random.random(),random.random()),
+                        gravity=(-0.04,-0.03),
+                        rotation=random.randint(0,365),
+                        rotation_vel=random.random(),
+                        lifetime=100
+                    ))
 
 
 

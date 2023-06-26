@@ -28,4 +28,4 @@ _To restart reopen the program_
 - [ ] Restarting the game
 - [ ] Main menu
 - [ ] Saving/loading high scores
-- [ ] Fix incorrect explosion position
+- [x] Fix incorrect explosion position
