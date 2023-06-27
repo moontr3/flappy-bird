@@ -249,36 +249,6 @@ class Map:
 
                 for i in range(100):
                     rect = pg.Rect(rpos, (80,30))
-                    color = (0,255,0)
-
-                    vel += 0.2
-                    pos[0] += SPEED
-                    pos[1] += vel
-                    rpos[0] += SPEED
-                    rpos[1] += vel
-
-                    rects = []
-                    for j in self.towers:
-                        rects.extend(j.to_rects())
-
-                    if rect.collidelistall(rects):
-                        color = (255,0,0)
-                        if not death:
-                            draw.text(f'{i}', (rect.topleft[0]+3, rect.topleft[1]+3), size=8, antialias=False)
-                            pg.draw.rect(screen, (255,0,0), rect, 1)
-                            death = True
-                    elif death:
-                        death = False
-
-                    pg.draw.circle(screen, color, pos, 1)
-
-                vel = self.player.jump_speed
-                pos = list(self.player.rect.center)
-                rpos = list(self.player.rect.topleft)
-                death = False
-
-                for i in range(100):
-                    rect = pg.Rect(rpos, (80,30))
                     color = (128,128,128)
 
                     vel += 0.2
@@ -294,7 +264,37 @@ class Map:
                     if rect.collidelistall(rects):
                         color = (255,0,0)
                         if not death:
+                            draw.text(f'{i}', (rect.topleft[0]+3, rect.topleft[1]+3), size=8, antialias=False)
                             pg.draw.rect(screen, (192,128,128), rect, 1)
+                            death = True
+                    elif death:
+                        death = False
+
+                    pg.draw.circle(screen, color, pos, 1)
+
+                vel = self.player.jump_speed
+                pos = list(self.player.rect.center)
+                rpos = list(self.player.rect.topleft)
+                death = False
+
+                for i in range(100):
+                    rect = pg.Rect(rpos, (80,30))
+                    color = (0,255,0)
+
+                    vel += 0.2
+                    pos[0] += SPEED
+                    pos[1] += vel
+                    rpos[0] += SPEED
+                    rpos[1] += vel
+
+                    rects = []
+                    for j in self.towers:
+                        rects.extend(j.to_rects())
+
+                    if rect.collidelistall(rects):
+                        color = (255,0,0)
+                        if not death:
+                            pg.draw.rect(screen, (255,0,0), rect, 1)
                             death = True
 
                     pg.draw.circle(screen, color, pos, 1)
