@@ -8,15 +8,6 @@ TODO
 - menus
 '''
 
-'''
-CONTROLS
-
-space / lmb to jump
-jump to start the game
-f3 to show debug information
-to restart reopen program
-'''
-
 import pygame as pg
 import easing_functions as easing
 import draw
@@ -24,13 +15,17 @@ import random
 
 pg.init()
 
+# game size (doesn't change on resize)
 windowx = 400
 windowy = 400
+
+# window resolution (changes when resizing)
 cx = 600
 cy = 600
+
 clock = pg.time.Clock()
-fps = 60
-dfps = 0.0
+fps = 60 # target fps (used in clock.tick)
+dfps = 0.0 # current fps (clock.get_fps assignes it)
 
 window = pg.display.set_mode((cx,cy), pg.RESIZABLE | pg.DOUBLEBUF)
 running = True
@@ -51,6 +46,7 @@ class Player:
     def __init__(self):
         self.image = sprites['player']
         self.moving = False
+        self.plane_mode = False
         self.vel = 0
         self.smooth_rot = 0
         self.pos = 200
@@ -60,9 +56,13 @@ class Player:
         self.death_rect_pos = 0
         self.calc_rect()
 
+    # recalcutates rect for the plane
     def calc_rect(self):
         self.rect = pg.Rect(110,self.pos, 80,30)
 
+    # this func gets called when the player collides with a tower
+    # or the ceiling/floor, if effect == False then it won't
+    # create an explosion effect
     def die(self, pos=200, effect=True):
         if self.dead: return
         self.dead = True
@@ -70,16 +70,21 @@ class Player:
         self.effect = effect
         self.death_rect_pos = pos
 
+    # jump/leap, also starts the game
     def jump(self):
         if self.dead: return
         if not self.moving: self.moving = True
 
-        self.vel = self.jump_speed
-        # self.vel -= 0.4
+        if not self.plane_mode:
+            self.vel = self.jump_speed
+        else:
+            self.vel -= 0.4 # smooth gliding
 
+    # updates the plane
     def update(self, towers):
+        # moving the plane
         if self.moving:
-            self.vel += 0.2
+            self.vel += 0.22
             self.pos += self.vel
             if self.pos > 500:
                 self.pos = 500
@@ -87,8 +92,10 @@ class Player:
         if jumped:
             self.jump()
 
-        # self.smooth_rot = -self.vel*4
+        # rotating the plane
         self.smooth_rot += (-self.vel*4-self.smooth_rot)/2
+
+        # checking collision
         self.calc_rect()
         
         collision = self.rect.collidelistall(towers)
@@ -98,6 +105,7 @@ class Player:
         if self.pos < 0 or self.pos > 370:
             self.die(effect=False)
 
+    # draws the plane
     def draw(self):
         image = self.image.copy()
         image = pg.transform.rotate(image, self.smooth_rot)
@@ -116,14 +124,17 @@ class Towers:
         self.gave_points = False
         self.calc_rects()
 
+    # recalculates rects for both of the towers
     def calc_rects(self):
         self.top = pg.Rect(self.xpos, self.ypos-370, 50,300)
         self.bottom = pg.Rect(self.xpos, self.ypos+70, 50,300)
 
+    # draws the towers
     def draw(self):
         screen.blit(self.image_top, (self.top[0], self.top[1]+10))
         screen.blit(self.image_bottom, (self.bottom[0], self.bottom[1]-10))
 
+    # updated the towers
     def update(self):
         self.xpos -= SPEED
         self.calc_rects()
@@ -131,6 +142,7 @@ class Towers:
         if self.xpos < -40:
             self.deletable = True
 
+    # returns towers' rects
     def to_rects(self):
         return [self.top, self.bottom]
     
@@ -138,39 +150,49 @@ class Towers:
 class Particle:
     def __init__(self, image, pos, size, vel=(0,0), gravity=(0,0), lifetime=60, alpha=255, rotation=0, rotation_vel=0):
         self.image = image
-        self.pos = list(pos)
-        self.vel = list(vel)
+        self.pos = list(pos) # starting position of the particle
+        self.vel = list(vel) # starting velocity of the particle
         self.size = size
         self.key = 0
         self.lifetime = lifetime
-        self.gravity = gravity
+        self.gravity = gravity # how much particle accelerates
+                               # eg if pos=(4,0) and gravity=(1,0)
+                               # then after updating the pos will be (5,0)
         self.alpha = alpha
         self.rotation = rotation
         self.rvel = rotation_vel
         self.deletable = False
 
+    # draws the particle
     def draw(self):
+        # calculating the size and opacity
         size = easing.QuinticEaseOut(0,1,self.lifetime).ease(self.key)
         sizex = size*self.size[0]
         sizey = size*self.size[1]
-        alpha = easing.QuinticEaseIn(255,0,self.lifetime).ease(self.key)
+        alpha = easing.QuinticEaseIn(255,0,self.lifetime).ease(self.key)*self.alpha/255
 
+        # modifying the image
         c = self.image.copy()
-        c.set_alpha(alpha*self.alpha/255)
+        c.set_alpha(alpha)
         c = pg.transform.scale(pg.transform.rotate(c, self.rotation), (sizex, sizey))
 
+        # drawing the image
         rect = c.get_rect()
         rect.center = self.pos
         screen.blit(c, rect)
 
+    # updates the particle
     def update(self):
+        # basic physics
         self.vel[0] += self.gravity[0]
         self.vel[1] += self.gravity[1]
         self.pos[0] += self.vel[0]
         self.pos[1] += self.vel[1]
 
+        # rotation
         self.rotation += self.rvel
 
+        # updaing
         self.key += 1
         if self.key > self.lifetime:
             self.deletable = True
@@ -182,9 +204,11 @@ class Bg:
         self.xpos = 450
         self.deletable = False
 
+    # draws the image
     def draw(self):
         screen.blit(self.image, (self.xpos, windowy-75))
 
+    # updates the image
     def update(self):
         self.xpos -= SPEED
 
@@ -197,21 +221,41 @@ class Map:
         self.towers = []
         self.bgs = []
         self.particles = []
-        self.explosion_timer = 0
-        self.explosions_left = 5
-        self.cur_type = 1
+        self.cur_type = 1 # current bg image, cycles through all bg images
         self.player = Player()
         self.points = 0
-        self.spawn_timeout = 0
+        self.spawn_timeout = 0 # timer in frames when to spawn newbgs and towers
         self.playing = False
         self.debug = False
-        self.smoke_timeout = 0
+        self.smoke_timeout = 0 # timer in frames when to create a smoke particle
         self.death_pos = (0,0)
+
+        self.begin_text_flash = 255
+        self.hi_opacity = 255
+        self.bottom_text = 'CLICK ANYWHERE TO BEGIN'
+
+        self.load_hi_score()
+
+    def load_hi_score(self):
+        try:
+            with open('save') as f:
+                self.hi_score = int(f.read())
+        except:
+            with open('save', 'w') as f:
+                f.write('0')
+            self.hi_score = 0
+        self.hi_score_text = f'HI: {self.hi_score}'
+
+    def write_hi_score(self):
+        if self.points <= self.hi_score: return
+        with open('save', 'w') as f:
+            f.write(str(self.points))
+        self.hi_score_text = f'NEW BEST'
 
     def new_towers(self):
         self.towers.append(Towers())
         self.bgs.append(Bg(self.cur_type))
-        self.spawn_timeout = 90
+        self.spawn_timeout = 190/SPEED
         self.cur_type += 1
         if self.cur_type > 2:
             self.cur_type = 1
@@ -226,22 +270,56 @@ class Map:
         for i in self.particles:
             i.draw()
 
+        # hi score
+        if self.hi_opacity > 0:
+            size = draw.get_text_size(self.hi_score_text, 8)
+            ease = easing.SineEaseIn(0,1,1).ease((255-self.hi_opacity)/255)*50
+            out_ease = easing.SineEaseInOut(0,1,1).ease(self.hi_opacity/255)*30
+
+            draw.text(self.hi_score_text, (halfx-2, 24-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.hi_score_text, (halfx+2, 24-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.hi_score_text, (halfx-2, 28-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.hi_score_text, (halfx+2, 28-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+
+            draw.text(self.hi_score_text, (halfx, 26-ease), size=8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        else:
+            out_ease = 0
+
+        # score
         size = draw.get_text_size(f'{self.points}')
         
-        draw.text(f'{self.points}', (halfx-3, 27), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-        draw.text(f'{self.points}', (halfx+3, 27), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-        draw.text(f'{self.points}', (halfx-3, 33), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-        draw.text(f'{self.points}', (halfx+3, 33), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx-3, 27+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx+3, 27+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx-3, 33+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx+3, 33+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx+5, 29+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx-1, 35+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx+5, 35+out_ease), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
 
-        draw.text(f'{self.points}', (halfx+5, 29), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-        draw.text(f'{self.points}', (halfx-1, 35), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-        draw.text(f'{self.points}', (halfx+5, 35), (0,0,0), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        draw.text(f'{self.points}', (halfx, 30+out_ease), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
 
-        draw.text(f'{self.points}', (halfx, 30), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        # bottom text
+        if self.hi_opacity > 0:
+            size = draw.get_text_size(self.hi_score_text, 8)
+            ease = easing.SineEaseIn(0,1,1).ease((255-self.hi_opacity)/255)*50
+            out_ease = easing.SineEaseInOut(0,1,1).ease(self.hi_opacity/255)*30
 
+            draw.text(self.hi_score_text, (halfx-2, 24-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.hi_score_text, (halfx+2, 24-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.hi_score_text, (halfx-2, 28-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.hi_score_text, (halfx+2, 28-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+
+            draw.text(self.hi_score_text, (halfx, 26-ease), size=8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+        else:
+            out_ease = 0
+
+        # debug menu
         if self.debug:
             if not self.player.dead:
+                # player
                 pg.draw.rect(screen, (0,0,255), self.player.rect, 4)
+
+                # where the player gonna be
                 vel = self.player.vel
                 pos = list(self.player.rect.center)
                 rpos = list(self.player.rect.topleft)
@@ -251,7 +329,7 @@ class Map:
                     rect = pg.Rect(rpos, (80,30))
                     color = (128,128,128)
 
-                    vel += 0.2
+                    vel += 0.22
                     pos[0] += SPEED
                     pos[1] += vel
                     rpos[0] += SPEED
@@ -272,6 +350,7 @@ class Map:
 
                     pg.draw.circle(screen, color, pos, 1)
 
+                # where the player gonna be if he jumped
                 vel = self.player.jump_speed
                 pos = list(self.player.rect.center)
                 rpos = list(self.player.rect.topleft)
@@ -281,7 +360,7 @@ class Map:
                     rect = pg.Rect(rpos, (80,30))
                     color = (0,255,0)
 
-                    vel += 0.2
+                    vel += 0.22
                     pos[0] += SPEED
                     pos[1] += vel
                     rpos[0] += SPEED
@@ -303,6 +382,7 @@ class Map:
                     for rect in i.to_rects():
                         pg.draw.rect(screen, (0,255,255), rect, 2)
 
+            # fps
             draw.text(f'FPS: {dfps}', (2,3), (0,0,0), size=8, antialias=False)
             draw.text(f'FPS: {dfps}', (2,2), size=8, antialias=False)
             
@@ -317,7 +397,11 @@ class Map:
             self.player.moving = True
             self.playing = True
 
+        # basically the main loop
         if self.playing:
+            if self.hi_opacity > 0:
+                self.hi_opacity -= 10
+
             self.spawn_timeout -= 1
             if self.spawn_timeout <= 0:
                 self.new_towers()
@@ -327,6 +411,10 @@ class Map:
                 if i.deletable:
                     self.bgs.remove(i)
 
+        elif self.hi_opacity < 255:
+            self.hi_opacity += 10
+
+        # towers and points
         towers = []
         for i in self.towers:
             if self.playing:
@@ -340,10 +428,15 @@ class Map:
                 self.towers.remove(i)
             towers.extend(i.to_rects())
 
+        # player
         self.player.update(towers)
 
         if self.player.dead:
             if self.playing:
+                # on player death
+                self.bottom_text = 'CLICK ANYWHERE TO RESTART'
+                self.write_hi_score()
+
                 self.playing = False
                 self.death_pos = (self.player.death_rect_pos,self.player.pos+10)
                 if self.player.effect:
@@ -358,6 +451,7 @@ class Map:
                         ))
     
             if self.player.effect:
+                # that smoke effect
                 self.smoke_timeout -= 1
                 if self.smoke_timeout <= 0:
                     self.smoke_timeout = 15
@@ -448,9 +542,12 @@ while running:
     game.draw()
     game.update()
 
+    # scaling the surface to match the window resolution (cx, cy)
     c = screen.copy()
     c = pg.transform.smoothscale(c, (cx, cy))
     window.blit(c, (0,0))
+
+    # updating
     pg.display.flip()
     clock.tick(fps)
     dfps = round(clock.get_fps(), 1)
