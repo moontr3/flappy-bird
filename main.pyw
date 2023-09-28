@@ -111,6 +111,7 @@ class Player:
         image = pg.transform.rotate(image, self.smooth_rot)
         rect = image.get_rect()
         rect.center = self.rect.center
+        rect.x += game.end_pos_offset
         screen.blit(image, rect)
 
 
@@ -131,8 +132,8 @@ class Towers:
 
     # draws the towers
     def draw(self):
-        screen.blit(self.image_top, (self.top[0], self.top[1]+10))
-        screen.blit(self.image_bottom, (self.bottom[0], self.bottom[1]-10))
+        screen.blit(self.image_top, (self.top[0]+game.end_pos_offset, self.top[1]+10))
+        screen.blit(self.image_bottom, (self.bottom[0]+game.end_pos_offset, self.bottom[1]-10))
 
     # updated the towers
     def update(self):
@@ -179,6 +180,7 @@ class Particle:
         # drawing the image
         rect = c.get_rect()
         rect.center = self.pos
+        rect.x += game.end_pos_offset
         screen.blit(c, rect)
 
     # updates the particle
@@ -206,7 +208,7 @@ class Bg:
 
     # draws the image
     def draw(self):
-        screen.blit(self.image, (self.xpos, windowy-75))
+        screen.blit(self.image, (self.xpos+game.end_pos_offset, windowy-75))
 
     # updates the image
     def update(self):
@@ -230,9 +232,13 @@ class Map:
         self.smoke_timeout = 0 # timer in frames when to create a smoke particle
         self.death_pos = (0,0)
 
-        self.begin_text_flash = 255
         self.hi_opacity = 255
         self.bottom_text = 'CLICK ANYWHERE TO BEGIN'
+        self.bottom_text_blink = 0
+        self.ending = False
+        self.end_key = 0.0
+        self.end_pos_offset = 0
+        self.decoy_pos = None
 
         self.load_hi_score()
 
@@ -270,6 +276,14 @@ class Map:
         for i in self.particles:
             i.draw()
 
+        # player decoy
+        if self.decoy_pos != None:
+            prect = pg.Rect(self.decoy_pos, 200, 80,30)
+            image = sprites['player']
+            rect = image.get_rect()
+            rect.center = prect.center
+            screen.blit(image, rect)
+
         # hi score
         if self.hi_opacity > 0:
             size = draw.get_text_size(self.hi_score_text, 8)
@@ -299,19 +313,15 @@ class Map:
         draw.text(f'{self.points}', (halfx, 30+out_ease), horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
 
         # bottom text
-        if self.hi_opacity > 0:
-            size = draw.get_text_size(self.hi_score_text, 8)
-            ease = easing.SineEaseIn(0,1,1).ease((255-self.hi_opacity)/255)*50
-            out_ease = easing.SineEaseInOut(0,1,1).ease(self.hi_opacity/255)*30
+        if self.bottom_text_blink > 10 and not self.playing:
+            size = draw.get_text_size(self.bottom_text, 8)
 
-            draw.text(self.hi_score_text, (halfx-2, 24-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-            draw.text(self.hi_score_text, (halfx+2, 24-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-            draw.text(self.hi_score_text, (halfx-2, 28-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-            draw.text(self.hi_score_text, (halfx+2, 28-ease), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
+            draw.text(self.bottom_text, (halfx-2, windowy-28), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*1.5, size[1]*1.5))
+            draw.text(self.bottom_text, (halfx+2, windowy-28), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*1.5, size[1]*1.5))
+            draw.text(self.bottom_text, (halfx-2, windowy-32), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*1.5, size[1]*1.5))
+            draw.text(self.bottom_text, (halfx+2, windowy-32), (0,0,0), 8, horizontal_margin='m', rect_size=(size[0]*1.5, size[1]*1.5))
 
-            draw.text(self.hi_score_text, (halfx, 26-ease), size=8, horizontal_margin='m', rect_size=(size[0]*2, size[1]*2))
-        else:
-            out_ease = 0
+            draw.text(self.bottom_text, (halfx, windowy-30), size=8, horizontal_margin='m', rect_size=(size[0]*1.5, size[1]*1.5))
 
         # debug menu
         if self.debug:
@@ -397,6 +407,10 @@ class Map:
             self.player.moving = True
             self.playing = True
 
+        self.bottom_text_blink += 1
+        if self.bottom_text_blink > 30:
+            self.bottom_text_blink = 0
+
         # basically the main loop
         if self.playing:
             if self.hi_opacity > 0:
@@ -428,10 +442,23 @@ class Map:
                 self.towers.remove(i)
             towers.extend(i.to_rects())
 
+        # end animation
+        if self.ending:
+            self.end_key += 0.015
+            self.end_pos_offset = easing.SineEaseIn(0,1,1).ease(self.end_key)*(windowx+100)
+            self.decoy_pos = easing.SineEaseInOut(0,1,1).ease(self.end_key)*210-100
+
+            if self.end_key >= 1.0:
+                global game
+                game = Map()
+
         # player
         self.player.update(towers)
 
         if self.player.dead:
+            if jumped:
+                self.ending = True
+                
             if self.playing:
                 # on player death
                 self.bottom_text = 'CLICK ANYWHERE TO RESTART'
