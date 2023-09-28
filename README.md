@@ -1,10 +1,16 @@
 # flappy-bird
 
-Yes.
+**This project is not fully finished!**
 
-**This project is unfinished!**
+The perfect example of this game for me to show is this:
+
+![](images/image.png)
 
 ## Running
+
+Download the [latest release](https://github.com/moontr3/flappy-bird/releases/latest)
+
+_or_
 
 Clone the repository and run the game
 
@@ -18,14 +24,5 @@ python main.pyw
 
 | Key | Action |
 |-----|-----|
-| `Space` / `LMB` | Jump/leap or start the game |
+| `Space` / `LMB` | Jump/leap, start the game, restart the game |
 | `F3` | Show debug information |
-
-_To restart reopen the program_
-
-## Todo
-
-- [ ] Restarting the game
-- [ ] Main menu
-- [ ] Saving/loading high scores
-- [x] Fix incorrect explosion position
